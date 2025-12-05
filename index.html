@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión RICE - Colegio Purísima Concepción</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Mermaid para Diagramas -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+    </script>
+
+    <!-- Firebase Compat SDK v10.7.1 -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- Base de Datos Completa RICE (55 faltas + 24 medidas) -->
+    <script src="rice_database.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+
+        .card {
+            background: white;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+            transition: all 0.2s;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-primary:hover {
+            background-color: #4338ca;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            transition: all 0.2s;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+        }
+
+        .btn-secondary:hover {
+            background-color: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .rice-table th {
+            background-color: #eef2ff;
+            color: #312e81;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #c7d2fe;
+        }
+
+        .rice-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.875rem;
+            vertical-align: top;
+        }
+
+        .rice-table tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        .badge-leve {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+
+        .badge-grave {
+            background-color: #fef9c3;
+            color: #854d0e;
+            border: 1px solid #fde047;
+        }
+
+        .badge-gravisima {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+
+            .card {
+                border: none;
+                box-shadow: none;
+            }
+
+            .tab-content {
+                display: block !important;
+            }
+
+            #resultArea {
+                display: block !important;
+                position: static !important;
+                width: 100%;
+                margin-top: 20px;
+                break-after: page;
+            }
+        }
+
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #4f46e5;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-7xl mx-auto">
+
+        <!-- HEADER -->
+        <header
+            class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-xl shadow-lg border border-gray-200 no-print">
+            <div class="flex items-center gap-4">
+                <div class="bg-indigo-600 text-white p-3 rounded-lg shadow-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M3 20h5l1-5h4l1 5h5M3 7l2-2m0 0l2-2m-2 2l-2 2M21 7l-2-2m0 0l-2-2m2 2l2 2" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Sistema de Gestión RICE</h1>
+                    <p class="text-sm text-gray-500 font-medium">Colegio de la Purísima Concepción</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="dbStatus"
+                    class="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-medium text-gray-500">
+                    <span class="w-2 h-2 rounded-full bg-gray-400"></span> Conectando...
+                </div>
+                <button onclick="app.ui.openConfigModal()"
+                    class="btn-secondary text-sm font-medium shadow-sm flex items-center gap-2">
+                    <span>🔑</span> Configurar IA
+                </button>
+            </div>
+        </header>
+
+        <!-- NAVEGACIÓN -->
+        <nav class="mb-8 no-print overflow-x-auto pb-2">
+            <div class="flex space-x-2 min-w-max" id="navTabs">
+                <button onclick="app.ui.switchTab('flowchart')" id="tab-flowchart"
+                    class="px-5 py-2.5 rounded-lg text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 transition-colors">
+                    📊 Protocolos
+                </button>
+                <button onclick="app.ui.switchTab('procedure')" id="tab-procedure"
+                    class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors">
+                    📜 Reglamento (RICE)
+                </button>
+                <button onclick="app.ui.switchTab('tools')" id="tab-tools"
+                    class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors">
+                    🤖 Herramientas IA
+                </button>
+                <button onclick="app.ui.switchTab('bitacora')" id="tab-bitacora"
+                    class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-colors">
+                    📚 Bitácora Compartida
+                </button>
+            </div>
+        </nav>
+
+        <!-- VISTA 1: PROTOCOLOS (FLUJOGRAMA) -->
+        <div id="view-flowchart" class="tab-content">
+            <div class="card p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Protocolo General de Actuación RICE</h2>
+                <div class="mermaid">
+                    graph TD
+                    A[Inicio: Detección de Falta] --> B{Tipo de Falta?}
+                    B -->|Leve| C[Amonestación Verbal/Escrita]
+                    B -->|Grave| D[Citación Apoderado]
+                    B -->|Gravísima| E[Suspensión / Expulsión]
+                    C --> F[Registro en Bitácora]
+                    D --> F
+                    E --> G[Denuncia Externa si aplica]
+                    G --> F
+                    F --> H[Seguimiento Psicosocial]
+                    H --> I[Cierre del Caso]
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 2: REGLAMENTO -->
+        <div id="view-procedure" class="tab-content hidden">
+            <div class="card overflow-hidden">
+                <div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center no-print">
+                    <h3 class="font-bold text-gray-800">Tabla de Faltas y Medidas RICE</h3>
+                    <div class="flex gap-2">
+                        <select id="riceFilter" class="p-1.5 border rounded-lg text-sm bg-white"
+                            onchange="app.ui.renderRiceTable()">
+                            <option value="all">Todas</option>
+                            <option value="leve">Leves</option>
+                            <option value="grave">Graves</option>
+                            <option value="gravisima">Gravísimas</option>
+                        </select>
+                        <input type="text" id="riceSearch" placeholder="Buscar..."
+                            class="p-1.5 border rounded-lg text-sm w-48" onkeyup="app.ui.renderRiceTable()">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm rice-table">
+                        <thead>
+                            <tr>
+                                <th class="w-24">Nivel</th>
+                                <th class="w-48">Falta</th>
+                                <th>Descripción y Medidas</th>
+                                <th class="w-48">Responsable</th>
+                                <th class="w-32 no-print">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="riceTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 3: HERRAMIENTAS IA -->
+        <div id="view-tools" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="card p-6 border-l-4 border-indigo-500">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">📝 Generador de Documentos RICE</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estudiante</label>
+                                <input type="text" id="docStudent" class="w-full p-2 border rounded-lg text-sm"
+                                    placeholder="Nombre completo">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Curso</label>
+                                <input type="text" id="docCourse" class="w-full p-2 border rounded-lg text-sm"
+                                    placeholder="Ej. 8° Básico">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de
+                                        Documento</label>
+                                    <select id="docType" class="w-full p-2 border rounded-lg text-sm bg-white">
+                                        <option value="Carta de Amonestación">Carta de Amonestación</option>
+                                        <option value="Citación Apoderado">Citación Apoderado</option>
+                                        <option value="Informe Disciplinario">Informe Disciplinario</option>
+                                        <option value="Acta de Compromiso">Acta de Compromiso</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Falta
+                                        RICE</label>
+                                    <input type="text" id="hiddenRiceMeasures" class="hidden">
+                                    <select id="docRiceFault" class="w-full p-2 border rounded-lg text-sm bg-white"
+                                        onchange="document.getElementById('hiddenRiceMeasures').value = this.value">
+                                        <option value="">Seleccionar...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Detalles del
+                                    Caso</label>
+                                <textarea id="docDetails" rows="3"
+                                    class="w-full p-2 border rounded-lg text-sm resize-none"
+                                    placeholder="Describe la situación..."></textarea>
+                            </div>
+                            <button onclick="app.ai.generateDocument()" id="btnGenDoc"
+                                class="btn-primary w-full py-2.5 font-bold shadow-md flex items-center justify-center gap-2">
+                                <span id="btnGenDocSpinner" class="spinner hidden"></span>
+                                <span id="btnGenDocText">✨ Generar Documento</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="card p-5 border-l-4 border-indigo-500">
+                            <h3 class="text-sm font-bold text-gray-800 mb-2">⚖️ Asistente Jurídico</h3>
+                            <textarea id="analysisInput" rows="2" class="w-full p-2 border rounded-md text-xs mb-2"
+                                placeholder="Caso o duda..."></textarea>
+                            <button onclick="app.ai.analyzeCase()" id="btnAnalyze"
+                                class="btn-secondary w-full py-1.5 rounded text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50">Analizar</button>
+                        </div>
+                        <div class="card p-5 border-l-4 border-blue-500">
+                            <h3 class="text-sm font-bold text-gray-800 mb-2">📋 Protocolo</h3>
+                            <textarea id="protoInput" rows="2" class="w-full p-2 border rounded-md text-xs mb-2"
+                                placeholder="Situación..."></textarea>
+                            <button onclick="app.ai.generateProtocol()" id="btnProto"
+                                class="btn-secondary w-full py-1.5 rounded text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50">Generar
+                                Guía</button>
+                        </div>
+                        <div class="card p-5 border-l-4 border-teal-500">
+                            <h3 class="text-sm font-bold text-gray-800 mb-2">💡 Talleres</h3>
+                            <div class="flex gap-2 mb-2">
+                                <input id="wsGrade" class="w-1/3 p-1 border rounded text-xs" placeholder="Curso">
+                                <input id="wsTopic" class="w-2/3 p-1 border rounded text-xs" placeholder="Tema">
+                            </div>
+                            <button onclick="app.ai.generateWorkshop()" id="btnWorkshop"
+                                class="btn-secondary w-full py-1.5 rounded text-xs font-bold text-teal-600 border-teal-200 hover:bg-teal-50">Planificar</button>
+                        </div>
+                        <div class="card p-5 border-l-4 border-orange-500">
+                            <h3 class="text-sm font-bold text-gray-800 mb-2">📧 Correos</h3>
+                            <select id="emailTone" class="w-full mb-2 p-1 border rounded text-xs">
+                                <option value="Informativo">Informativo</option>
+                                <option value="Citación Urgente">Citación Urgente</option>
+                                <option value="Seguimiento">Seguimiento</option>
+                            </select>
+                            <input id="emailDetail" class="w-full p-1 border rounded text-xs mb-2"
+                                placeholder="Motivo...">
+                            <button onclick="app.ai.generateEmail()" id="btnEmail"
+                                class="btn-secondary w-full py-1.5 rounded text-xs font-bold text-orange-600 border-orange-200 hover:bg-orange-50">Redactar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 space-y-6">
+                    <div id="resultArea"
+                        class="card p-0 hidden lg:sticky lg:top-8 border-2 border-indigo-100 shadow-xl">
+                        <div
+                            class="bg-indigo-50 p-3 border-b border-indigo-100 flex justify-between items-center rounded-t-lg">
+                            <h3 class="font-bold text-indigo-800 text-sm flex items-center gap-2">
+                                <span>✨</span> <span id="outputTitle">Resultado</span>
+                            </h3>
+                            <button onclick="app.ui.closeResult()"
+                                class="text-indigo-400 hover:text-red-500 transition">✕</button>
+                        </div>
+                        <div id="aiOutput"
+                            class="p-6 text-sm text-gray-800 font-serif leading-relaxed max-h-[65vh] overflow-y-auto bg-white">
+                        </div>
+                        <div class="p-4 border-t border-gray-100 bg-gray-50 rounded-b-lg flex gap-3 justify-end">
+                            <button onclick="app.firebase.saveCurrent()" id="btnSaveResult"
+                                class="btn-secondary px-3 py-1.5 text-xs font-bold text-green-700 border-green-200 hover:bg-green-50 flex items-center gap-1">
+                                <span>💾</span> Guardar
+                            </button>
+                            <button onclick="app.utils.downloadDoc()" id="btnDownloadDoc"
+                                class="btn-primary px-3 py-1.5 text-xs font-bold shadow-sm flex items-center gap-1">
+                                <span>📄</span> Word
+                            </button>
+                            <button onclick="window.print()"
+                                class="btn-secondary px-3 py-1.5 text-xs font-bold text-gray-700 border-gray-300 hover:bg-gray-100 flex items-center gap-1">
+                                <span>🖨️</span> Imprimir
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-xs font-bold text-gray-400 uppercase">Historial Sesión</h4>
+                            <button onclick="app.utils.clearHistory()"
+                                class="text-xs text-gray-400 hover:text-red-500">Borrar</button>
+                        </div>
+                        <div id="localHistory" class="space-y-2 max-h-48 overflow-y-auto">
+                            <p class="text-xs text-gray-400 italic text-center py-2" id="emptyHistoryMsg">Vacío</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA 4: BITÁCORA -->
+        <div id="view-bitacora" class="tab-content hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 no-print">
+                <div class="card p-4 border-l-4 border-indigo-500">
+                    <p class="text-xs font-bold text-gray-400 uppercase">Total</p>
+                    <p class="text-2xl font-bold text-indigo-700" id="statTotal">0</p>
+                </div>
+                <div class="card p-4 border-l-4 border-green-500">
+                    <p class="text-xs font-bold text-gray-400 uppercase">Leves</p>
+                    <p class="text-2xl font-bold text-green-700" id="statLeve">0</p>
+                </div>
+                <div class="card p-4 border-l-4 border-yellow-500">
+                    <p class="text-xs font-bold text-gray-400 uppercase">Graves</p>
+                    <p class="text-2xl font-bold text-yellow-700" id="statGrave">0</p>
+                </div>
+                <div class="card p-4 border-l-4 border-red-500">
+                    <p class="text-xs font-bold text-gray-400 uppercase">Gravísimas</p>
+                    <p class="text-2xl font-bold text-red-700" id="statGravisima">0</p>
+                </div>
+            </div>
+
+            <div class="card overflow-hidden">
+                <div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center no-print">
+                    <h3 class="font-bold text-gray-800">Registro Histórico Compartido</h3>
+                    <div class="flex gap-2">
+                        <button onclick="app.ui.openManualModal()"
+                            class="btn-primary text-xs shadow-sm flex items-center gap-1">
+                            <span>+</span> Nuevo Registro
+                        </button>
+                        <input type="text" id="bitacoraSearch" placeholder="Buscar..."
+                            class="p-1.5 border rounded-lg text-sm w-48 focus:ring-1 focus:ring-indigo-500 outline-none"
+                            onkeyup="app.ui.renderBitacora()">
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm rice-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Estudiante</th>
+                                <th>Nivel</th>
+                                <th>Acción / Resumen</th>
+                                <th class="w-32 no-print">Opciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bitacoraBody">
+                            <tr>
+                                <td colspan="5" class="p-8 text-center text-gray-400">Esperando conexión a la nube...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALES -->
+    <div id="modalConfig"
+        class="fixed inset-0 bg-gray-900/60 hidden flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-200">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Configuración IA</h3>
+            <p class="text-sm text-gray-600 mb-4">Ingresa tu API Key de Gemini.</p>
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Google API Key</label>
+                <input type="password" id="inputApiKey"
+                    class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="AIzaSy...">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="document.getElementById('modalConfig').classList.add('hidden')"
+                    class="btn-secondary text-sm">Cancelar</button>
+                <button onclick="app.config.saveKey()" class="btn-primary text-sm">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalManual"
+        class="fixed inset-0 bg-gray-900/60 hidden flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-200">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Registro Manual</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estudiante</label>
+                    <input type="text" id="manStudent" class="w-full p-2 border rounded-lg text-sm"
+                        placeholder="Nombre completo">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nivel</label>
+                        <select id="manLevel" class="w-full p-2 border rounded-lg text-sm bg-white"
+                            onchange="app.ui.updateManualFaults()">
+                            <option value="leve">Leve</option>
+                            <option value="grave">Grave</option>
+                            <option value="gravisima">Gravísima</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Falta</label>
+                        <select id="manFault" class="w-full p-2 border rounded-lg text-sm bg-white"></select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Observaciones</label>
+                    <textarea id="manDetails" rows="3"
+                        class="w-full p-2 border rounded-lg text-sm resize-none"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-6">
+                <button onclick="document.getElementById('modalManual').classList.add('hidden')"
+                    class="btn-secondary text-sm">Cancelar</button>
+                <button onclick="app.firebase.saveManual()" class="btn-primary text-sm">Registrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUBq3CSh6ySSi3YuxZLDBR5P6izBuCudc",
+            authDomain: "gestor-rice.firebaseapp.com",
+            projectId: "gestor-rice",
+            storageBucket: "gestor-rice.firebasestorage.app",
+            messagingSenderId: "1041165637622",
+            appId: "1:1041165637622:web:a1d3f87c961986c53d99d7"
+        };
+
+        // APLICACIÓN PRINCIPAL
+        const app = {
+            db: null,
+            auth: null,
+            userId: null,
+            apiKey: "",
+            bitacoraData: [],
+            currentOutput: { title: '', content: '' },
+
+            config: {
+                init: async () => {
+                    app.ui.renderRiceTable();
+                    app.ui.populateRiceFaultSelect();
+                    app.config.loadKey();
+
+                    if (firebaseConfig) {
+                        try {
+                            if (!firebase.apps.length) {
+                                firebase.initializeApp(firebaseConfig);
+                            }
+                            app.db = firebase.firestore();
+                            app.auth = firebase.auth();
+
+                            app.auth.onAuthStateChanged(user => {
+                                if (user) {
+                                    app.userId = user.uid;
+                                    document.getElementById('dbStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500"></span> 🟢 Sincronizado';
+                                    app.firebase.startBitacoraListener();
+                                    app.ui.updateManualFaults();
+                                } else {
+                                    app.auth.signInAnonymously().catch(error => {
+                                        console.error("Error Auth Anónima:", error);
+                                        document.getElementById('dbStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> Error Conexión';
+                                    });
+                                }
+                            });
+                        } catch (error) {
+                            console.error("Error Firebase:", error);
+                            document.getElementById('dbStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-yellow-500"></span> Configuración Inválida';
+                        }
+                    } else {
+                        document.getElementById('dbStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-gray-400"></span> Sin Configurar';
+                        document.getElementById('bitacoraBody').innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">⚠️ Debes pegar la configuración de Firebase en el código para ver la bitácora compartida.</td></tr>';
+                    }
+                },
+                loadKey: () => {
+                    const key = localStorage.getItem('geminiApiKey');
+                    if (key) {
+                        app.apiKey = key;
+                        document.getElementById('inputApiKey').value = key;
+                    }
+                },
+                saveKey: () => {
+                    const key = document.getElementById('inputApiKey').value.trim();
+                    if (key) {
+                        localStorage.setItem('geminiApiKey', key);
+                        app.apiKey = key;
+                        document.getElementById('modalConfig').classList.add('hidden');
+                        alert("API Key guardada.");
+                    }
+                },
+            },
+
+            firebase: {
+                getCollection: () => {
+                    if (!app.db) return null;
+                    return app.db.collection('rice_bitacora_compartida');
+                },
+                startBitacoraListener: () => {
+                    const ref = app.firebase.getCollection();
+                    if (!ref) return;
+                    ref.orderBy('timestamp', 'desc').limit(50).onSnapshot(snapshot => {
+                        app.bitacoraData = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data(),
+                            timestamp: doc.data().timestamp ? doc.data().timestamp.toDate() : new Date()
+                        }));
+                        app.ui.renderBitacora();
+                        app.ui.updateStats();
+                    });
+                },
+                saveCurrent: async () => {
+                    if (!app.db) { alert("Falta configuración de Firebase."); return; }
+                    const student = document.getElementById('docStudent').value.trim();
+                    const course = document.getElementById('docCourse').value.trim();
+                    const docType = document.getElementById('docType').value;
+                    const details = document.getElementById('docDetails').value.trim();
+                    const riceId = document.getElementById('hiddenRiceMeasures').value;
+                    if (!student || !app.currentOutput.content) { alert("Falta información."); return; }
+
+                    const fault = RICE_DB.find(f => f.id === riceId) || { name: docType, type: 'manual' };
+                    try {
+                        await app.firebase.getCollection().add({
+                            student,
+                            course,
+                            type: fault.name,
+                            level: fault.type,
+                            summary: details.substring(0, 100) + '...',
+                            fullDocument: app.currentOutput.content,
+                            generatedBy: app.userId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        alert("Guardado en la nube compartida.");
+                        app.ui.closeResult();
+                    } catch (e) { alert("Error al guardar: " + e.message); }
+                },
+                saveManual: async () => {
+                    if (!app.db) { alert("Falta configuración de Firebase."); return; }
+                    const student = document.getElementById('manStudent').value.trim();
+                    const level = document.getElementById('manLevel').value;
+                    const fault = document.getElementById('manFault').value;
+                    const details = document.getElementById('manDetails').value.trim();
+                    if (!student || !details) { alert("Complete los campos."); return; }
+
+                    try {
+                        await app.firebase.getCollection().add({
+                            student, type: fault, level,
+                            summary: details, fullDocument: details,
+                            generatedBy: app.userId,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        document.getElementById('modalManual').classList.add('hidden');
+                        alert("Registro guardado en la nube.");
+                        document.getElementById('manStudent').value = '';
+                        document.getElementById('manDetails').value = '';
+                    } catch (e) { alert("Error al guardar: " + e.message); }
+                },
+                deleteEntry: async (id) => {
+                    if (!app.db) return;
+                    if (!confirm("¿Estás seguro de que quieres eliminar este registro? Esta acción no se puede deshacer.")) return;
+                    try {
+                        await app.firebase.getCollection().doc(id).delete();
+                        alert("Registro eliminado.");
+                    } catch (e) { alert("Error al eliminar: " + e.message); }
+                }
+            },
+
+            ui: {
+                switchTab: (viewId) => {
+                    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                    document.querySelectorAll('#navTabs button').forEach(el => {
+                        el.classList.remove('bg-indigo-50', 'border-indigo-100', 'text-indigo-700');
+                        el.classList.add('text-gray-600', 'hover:bg-gray-50', 'border-transparent');
+                    });
+                    document.getElementById(`view-${viewId}`).classList.remove('hidden');
+                    document.getElementById(`tab-${viewId}`).classList.add('bg-indigo-50', 'border-indigo-100', 'text-indigo-700');
+                    if (viewId === 'flowchart') setTimeout(() => mermaid.init(undefined, document.querySelectorAll('.mermaid')), 100);
+                },
+                renderRiceTable: () => {
+                    const body = document.getElementById('riceTableBody');
+                    const search = document.getElementById('riceSearch').value.toLowerCase();
+                    const filter = document.getElementById('riceFilter').value;
+                    const filtered = RICE_DB.filter(i => (filter === 'all' || i.type === filter) && (i.name.toLowerCase().includes(search) || i.desc.toLowerCase().includes(search)));
+                    body.innerHTML = filtered.map(i => `
+                        <tr>
+                            <td><span class="badge badge-${i.type}">${i.type.toUpperCase()}</span></td>
+                            <td>${i.name}</td>
+                            <td><p class="font-medium">${i.desc}</p><p class="text-xs text-gray-500 mt-1">${i.measures}</p></td>
+                            <td>${i.resp}</td>
+                            <td class="text-center no-print"><button onclick="app.ui.prefill('${i.id}')" class="btn-primary text-xs px-2 py-1">Usar IA</button></td>
+                        </tr>`).join('');
+                },
+                populateRiceFaultSelect: () => {
+                    const select = document.getElementById('docRiceFault');
+                    select.innerHTML = '<option value="">Seleccionar...</option>' +
+                        RICE_DB.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+                },
+                prefill: (id) => {
+                    const f = RICE_DB.find(x => x.id === id);
+                    document.getElementById('docDetails').value = `Falta: ${f.name}.`;
+                    document.getElementById('hiddenRiceMeasures').value = id;
+                    document.getElementById('docRiceFault').value = id;
+                    app.ui.switchTab('tools');
+                },
+                showResult: (content, title) => {
+                    app.currentOutput = { content, title };
+                    document.getElementById('outputTitle').innerText = title;
+                    document.getElementById('aiOutput').innerHTML = content;
+                    document.getElementById('resultArea').classList.remove('hidden');
+                },
+                closeResult: () => document.getElementById('resultArea').classList.add('hidden'),
+                openConfigModal: () => document.getElementById('modalConfig').classList.remove('hidden'),
+                openManualModal: () => { app.ui.updateManualFaults(); document.getElementById('modalManual').classList.remove('hidden'); },
+                updateManualFaults: () => {
+                    const lvl = document.getElementById('manLevel').value;
+                    const opts = RICE_DB.filter(f => f.type === lvl).map(f => `<option value="${f.name}">${f.name}</option>`).join('');
+                    document.getElementById('manFault').innerHTML = opts;
+                },
+                renderBitacora: () => {
+                    const body = document.getElementById('bitacoraBody');
+                    const search = document.getElementById('bitacoraSearch').value.toLowerCase();
+                    const data = app.bitacoraData.filter(i => i.student.toLowerCase().includes(search));
+                    if (!data.length) { body.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-400">Sin registros.</td></tr>'; return; }
+                    body.innerHTML = data.map(i => `
+                        <tr>
+                            <td>${i.timestamp.toLocaleDateString()}</td>
+                            <td class="font-semibold">${i.student}${i.course ? '<br><span class="text-xs text-gray-500">' + i.course + '</span>' : ''}</td>
+                            <td><span class="badge badge-${i.level}">${i.level.toUpperCase()}</span></td>
+                            <td class="max-w-md">
+                                <div class="font-bold text-indigo-700 cursor-pointer flex items-center gap-2" 
+                                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('span').classList.toggle('rotate-90')">
+                                    <span class="transition-transform duration-200">▶</span>
+                                    ${i.type || 'Registro'}
+                                </div>
+                                <div class="hidden mt-2 p-2 bg-gray-50 rounded text-sm text-gray-600 border border-gray-100">
+                                    <p class="font-semibold text-xs text-gray-400 uppercase mb-1">Detalle:</p>
+                                    ${i.summary}
+                                </div>
+                            </td>
+                            <td class="no-print flex gap-2">
+                                <button onclick="app.ui.showResult(\`${i.fullDocument.replace(/`/g, '\\`')}\`, 'Detalle')" class="btn-secondary text-xs px-2 py-1">Ver Doc</button>
+                                <button onclick="app.firebase.deleteEntry('${i.id}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1" title="Eliminar">🗑️</button>
+                            </td>
+                        </tr>`).join('');
+                },
+                updateStats: () => {
+                    const s = { leve: 0, grave: 0, gravisima: 0 };
+                    app.bitacoraData.forEach(i => s[i.level] && s[i.level]++);
+                    document.getElementById('statTotal').innerText = app.bitacoraData.length;
+                    document.getElementById('statLeve').innerText = s.leve;
+                    document.getElementById('statGrave').innerText = s.grave;
+                    document.getElementById('statGravisima').innerText = s.gravisima;
+                }
+            },
+
+            ai: {
+                callGemini: async (prompt) => {
+                    if (!app.apiKey) { alert("Configura tu API Key primero."); return null; }
+                    try {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-goog-api-key': app.apiKey },
+                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                        });
+                        const data = await response.json();
+                        return data.candidates[0].content.parts[0].text;
+                    } catch (e) { alert("Error IA: " + e.message); return null; }
+                },
+                generateDocument: async () => {
+                    const student = document.getElementById('docStudent').value.trim();
+                    const course = document.getElementById('docCourse').value.trim();
+                    const docType = document.getElementById('docType').value;
+                    const details = document.getElementById('docDetails').value.trim();
+                    const riceId = document.getElementById('hiddenRiceMeasures').value;
+                    if (!student || !details) { alert("Complete los campos obligatorios."); return; }
+
+                    const fault = RICE_DB.find(f => f.id === riceId);
+                    const faultInfo = fault ? `\nFalta RICE: ${fault.name}\nDescripción: ${fault.desc}\nMedidas: ${fault.measures}\nResponsable: ${fault.resp}` : '';
+                    const courseInfo = course ? ` del curso ${course}` : '';
+
+                    const prompt = `Actúa como un experto en Convivencia Escolar y redacción jurídica educativa.
+Genera un documento formal de tipo "${docType}" para el estudiante "${student}"${courseInfo}.
+
+Detalles del caso:
+${details}
+${faultInfo}
+
+INSTRUCCIONES DE REDACCIÓN:
+- Tono: Formal, pedagógico, objetivo y constructivo. Evita lenguaje excesivamente punitivo; enfócate en la formación y la normativa.
+- Estructura: Encabezado formal, Antecedentes, Hechos, Fundamentación Normativa (RICE), Medidas/Sanciones, y Compromisos.
+- Formato HTML:
+  - Usa <h3> para títulos de sección.
+  - Usa <b> para datos clave (fechas, nombres, curso).
+  - Usa <p> para párrafos bien estructurados.
+  - Usa <ul>/<li> para listar hechos o acuerdos.
+  - NO uses Markdown. Solo HTML limpio.`;
+
+                    const result = await app.ai.callGemini(prompt);
+                    if (result) app.ui.showResult(result, docType);
+                },
+                analyzeCase: async () => {
+                    const input = document.getElementById('analysisInput').value.trim();
+                    if (!input) { alert("Describe el caso."); return; }
+                    const prompt = `Como asesor jurídico educacional, analiza este caso:\n\n${input}\n\nProporciona un análisis legal y recomendaciones según el RICE.`;
+                    const result = await app.ai.callGemini(prompt);
+                    if (result) app.ui.showResult(result.replace(/\n/g, '<br>'), 'Análisis Jurídico');
+                },
+                generateProtocol: async () => {
+                    const input = document.getElementById('protoInput').value.trim();
+                    if (!input) { alert("Describe la situación."); return; }
+                    const prompt = `Genera un protocolo de acción paso a paso para esta situación:\n\n${input}\n\nIncluye pasos claros y responsables.`;
+                    const result = await app.ai.callGemini(prompt);
+                    if (result) app.ui.showResult(result.replace(/\n/g, '<br>'), 'Protocolo de Acción');
+                },
+                generateWorkshop: async () => {
+                    const grade = document.getElementById('wsGrade').value.trim();
+                    const topic = document.getElementById('wsTopic').value.trim();
+                    if (!grade || !topic) { alert("Complete curso y tema."); return; }
+                    const prompt = `Diseña un taller de convivencia escolar para ${grade} sobre "${topic}".\n\nIncluye objetivos, actividades y materiales.`;
+                    const result = await app.ai.callGemini(prompt);
+                    if (result) app.ui.showResult(result.replace(/\n/g, '<br>'), 'Plan de Taller');
+                },
+                generateEmail: async () => {
+                    const tone = document.getElementById('emailTone').value;
+                    const detail = document.getElementById('emailDetail').value.trim();
+                    if (!detail) { alert("Indica el motivo."); return; }
+                    const prompt = `Redacta un correo electrónico de tono "${tone}" para apoderados sobre:\n\n${detail}\n\nDebe ser profesional y claro.`;
+                    const result = await app.ai.callGemini(prompt);
+                    if (result) app.ui.showResult(result.replace(/\n/g, '<br>'), 'Correo Electrónico');
+                }
+            },
+
+            utils: {
+                downloadDoc: () => {
+                    const content = app.currentOutput.content;
+                    const blob = new Blob([content], { type: 'application/msword' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${app.currentOutput.title}.doc`;
+                    a.click();
+                },
+                clearHistory: () => {
+                    document.getElementById('localHistory').innerHTML = '<p class="text-xs text-gray-400 italic text-center py-2">Vacío</p>';
+                }
+            }
+        };
+
+        // INICIALIZAR
+        window.addEventListener('DOMContentLoaded', () => {
+            app.config.init();
+        });
+    </script>
+
+</body>
+
+</html>
