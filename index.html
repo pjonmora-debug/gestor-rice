@@ -849,12 +849,63 @@ INSTRUCCIONES DE REDACCIÓN:
             utils: {
                 downloadDoc: () => {
                     const content = app.currentOutput.content;
-                    const blob = new Blob([content], { type: 'application/msword' });
+
+                    // Crear documento HTML completo con estilo
+                    const htmlDocument = `
+<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+    <meta charset='utf-8'>
+    <title>${app.currentOutput.title}</title>
+    <style>
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            margin: 2cm;
+            color: #000000;
+        }
+        h3 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #1f4788;
+        }
+        p {
+            margin: 10px 0;
+            text-align: justify;
+        }
+        ul, ol {
+            margin: 10px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        b, strong {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    ${content}
+</body>
+</html>`;
+
+                    // Crear blob con tipo MIME correcto para Word
+                    const blob = new Blob([htmlDocument], {
+                        type: 'application/vnd.ms-word'
+                    });
+
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = `${app.currentOutput.title}.doc`;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
                 },
                 clearHistory: () => {
                     document.getElementById('localHistory').innerHTML = '<p class="text-xs text-gray-400 italic text-center py-2">Vacío</p>';
